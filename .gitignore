@@ -9,6 +9,10 @@
 /[Bb]uilds/
 /[Ll]ogs/
 /[Uu]ser[Ss]ettings/
+/[Aa]ssets/[Mm]APCHIP/
+/[Aa]ssets/オブジェクト用タイルマップ/
+/[Aa]ssets/Ruccho/
+/[Aa]ssets/タイルマップ/
 
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data

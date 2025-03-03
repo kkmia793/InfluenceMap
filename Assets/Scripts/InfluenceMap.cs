@@ -13,8 +13,11 @@ public class InfluenceMap : MonoBehaviour
     public float maxThreatDistance = 10f;
     public float maxAttractionDistance = 5f;
     
-    public float threatWeight = 0.4f;
-    public float itemWeight = 0.6f;
+    public float threatWeight = 0.5f;
+    public float itemWeight = 0.5f;
+
+    public enum EmotionalState { Neutral, Fearful, Joyful }
+    public EmotionalState currentEmotion = EmotionalState.Neutral;
 
     public int gridWidth { get; private set; }
     public int gridHeight { get; private set; }
@@ -168,6 +171,28 @@ public class InfluenceMap : MonoBehaviour
             }
         }
     }
+    
+    
+    
+    private void UpdateEmotionWeights()
+    {
+        switch (currentEmotion)
+        {
+            case EmotionalState.Fearful:
+                threatWeight = 0.8f;
+                itemWeight = 0.2f;
+                break;
+            case EmotionalState.Joyful:
+                threatWeight = 0.2f;
+                itemWeight = 0.8f;
+                break;
+            default: // 中立
+                threatWeight = 0.5f;
+                itemWeight = 0.5f;
+                break;
+        }
+    }
+    
 
     private void CombineMaps()
     {

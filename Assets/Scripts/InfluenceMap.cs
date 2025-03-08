@@ -22,6 +22,14 @@ public class InfluenceMap : MonoBehaviour
     public int gridWidth { get; private set; }
     public int gridHeight { get; private set; }
     private Vector3Int gridOrigin;
+    
+    private readonly Vector2Int[] directions = new Vector2Int[]
+    {
+        new Vector2Int(1, 0),
+        new Vector2Int(-1, 0),
+        new Vector2Int(0, 1),
+        new Vector2Int(0, -1)
+    };
 
     private float[,] threatMap;
     private float[,] itemMap;
@@ -134,7 +142,7 @@ public class InfluenceMap : MonoBehaviour
         return false;
     }
 
-    private void UpdateThreatMap()
+    /* private void UpdateThreatMap()
     {
         for (int x = 0; x < gridWidth; x++)
         {
@@ -150,8 +158,78 @@ public class InfluenceMap : MonoBehaviour
                 threatMap[x, y] = CalculateThreat(CellToWorld(cellPosition));
             }
         }
+    } */
+    
+    private void UpdateThreatMap()
+    {
+        float[,] distanceMap = new float[gridWidth, gridHeight];
+        bool[,] visited = new bool[gridWidth, gridHeight];
+        PriorityQueue<Vector2Int> priorityQueue = new PriorityQueue<Vector2Int>();
+
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                distanceMap[x, y] = float.MaxValue;
+                threatMap[x, y] = 0;
+            }
+        }
+
+        foreach (var ghost in ghosts)
+        {
+            if (ghost == null) continue;
+
+            Vector2Int gridPosition = WorldToCell(ghost.position);
+            if (IsValidGridPosition(gridPosition))
+            {
+                distanceMap[gridPosition.x, gridPosition.y] = 0;
+                priorityQueue.Enqueue(gridPosition, 0);
+            }
+        }
+        
+        // ダイクストラ法
+
+        while (priorityQueue.Count > 0)
+        {
+            var current = priorityQueue.Dequeue();
+            int x = current.x;
+            int y = current.y;
+
+            if (visited[x, y]) continue;
+            visited[x, y] = true;
+
+            float currentDistance = distanceMap[x, y];
+            float threat = Mathf.Max(0, maxThreatDistance - currentDistance);
+            threatMap[x, y] = threat;
+
+            foreach (var direction in directions)
+            {
+                Vector2Int neighbor = new Vector2Int(x + direction.x, y + direction.y);
+
+                if (IsValidGridPosition(neighbor) && !visited[neighbor.x, neighbor.y] && !IsObstacleCell(neighbor))
+                {
+                    float newDistance = currentDistance + cellSize;
+                    if (newDistance < distanceMap[neighbor.x, neighbor.y])
+                    {
+                        distanceMap[neighbor.x, neighbor.y] = newDistance;
+                        priorityQueue.Enqueue(neighbor, newDistance);
+                    }
+                }
+            }
+        }
     }
 
+    // グリッド内かどうか
+    private bool IsValidGridPosition(Vector2Int position)
+    {
+        return position.x >= 0 && position.x < gridWidth &&
+               position.y >= 0 && position.y < gridHeight;
+    }
+    
+    
+    
+
+    /*
     private void UpdateItemMap()
     {
         List<GameObject> apples = appleManager.GetActiveApples();
@@ -168,6 +246,66 @@ public class InfluenceMap : MonoBehaviour
                 }
 
                 itemMap[x, y] = CalculateAttractiveness(CellToWorld(cellPosition), apples);
+            }
+        }
+    }
+    */
+    
+    private void UpdateItemMap()
+    {
+        List<GameObject> apples = appleManager.GetActiveApples();
+        float[,] distanceMap = new float[gridWidth, gridHeight];
+        bool[,] visited = new bool[gridWidth, gridHeight];
+        PriorityQueue<Vector2Int> priorityQueue = new PriorityQueue<Vector2Int>();
+        
+        for (int x = 0; x < gridWidth; x++)
+        {
+            for (int y = 0; y < gridHeight; y++)
+            {
+                distanceMap[x, y] = float.MaxValue;
+                itemMap[x, y] = 0;
+            }
+        }
+        
+        foreach (var apple in apples)
+        {
+            if (apple == null) continue;
+
+            Vector2Int gridPosition = WorldToCell(apple.transform.position);
+            if (IsValidGridPosition(gridPosition))
+            {
+                distanceMap[gridPosition.x, gridPosition.y] = 0;
+                priorityQueue.Enqueue(gridPosition, 0);
+            }
+        }
+
+        // ダイクストラ法
+        while (priorityQueue.Count > 0)
+        {
+            var current = priorityQueue.Dequeue();
+            int x = current.x;
+            int y = current.y;
+
+            if (visited[x, y]) continue;
+            visited[x, y] = true;
+
+            float currentDistance = distanceMap[x, y];
+            float attractiveness = Mathf.Max(0, maxAttractionDistance - currentDistance);
+            itemMap[x, y] = attractiveness;
+
+            foreach (var direction in directions)
+            {
+                Vector2Int neighbor = new Vector2Int(x + direction.x, y + direction.y);
+
+                if (IsValidGridPosition(neighbor) && !visited[neighbor.x, neighbor.y] && !IsObstacleCell(neighbor))
+                {
+                    float newDistance = currentDistance + cellSize;
+                    if (newDistance < distanceMap[neighbor.x, neighbor.y])
+                    {
+                        distanceMap[neighbor.x, neighbor.y] = newDistance;
+                        priorityQueue.Enqueue(neighbor, newDistance);
+                    }
+                }
             }
         }
     }
@@ -245,8 +383,8 @@ public class InfluenceMap : MonoBehaviour
             }
         }
     }
-
-    // 敵の脅威度
+    
+    /* 元々のやり方（敵の脅威度の計算）
     private float CalculateThreat(Vector2 cellWorldPosition)
     {
         float totalThreat = 0;
@@ -263,8 +401,10 @@ public class InfluenceMap : MonoBehaviour
         }
         return totalThreat;
     }
+    */
+    
 
-    // アイテムの狙いやすさ
+    /* 元々のやり方（アイテムの狙いやすさの計算）
     private float CalculateAttractiveness(Vector2 cellWorldPosition, List<GameObject> apples)
     {
         float totalAttractiveness = 0;
@@ -281,6 +421,7 @@ public class InfluenceMap : MonoBehaviour
         }
         return totalAttractiveness;
     }
+    */
 
     public float GetCellScore(int x, int y)
     {

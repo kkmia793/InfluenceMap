@@ -5963,6 +5963,7 @@ MonoBehaviour:
   maxAttractionDistance: 8
   threatWeight: 0.5
   itemWeight: 0.5
+  currentEmotion: 0
   ghosts:
   - {fileID: 532989156}
   appleManager: {fileID: 2777943}

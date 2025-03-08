@@ -44,65 +44,67 @@ private void CombineMaps()
 
 - 脅威マップ (`UpdateThreatMap`) とアイテムマップ (`UpdateItemMap`) の両方で、ダイクストラ法を使用した効率的な影響度計算を行っています。
 
-// 
+
 ```csharp
-private void UpdateItemMap()
-{
-    List<GameObject> apples = appleManager.GetActiveApples();
-    float[,] distanceMap = new float[gridWidth, gridHeight];
-    bool[,] visited = new bool[gridWidth, gridHeight];
-    PriorityQueue<Vector2Int> priorityQueue = new PriorityQueue<Vector2Int>();
-    
-    for (int x = 0; x < gridWidth; x++)
+    private void UpdateThreatMap()
     {
-        for (int y = 0; y < gridHeight; y++)
+        float[,] distanceMap = new float[gridWidth, gridHeight];
+        bool[,] visited = new bool[gridWidth, gridHeight];
+        PriorityQueue<Vector2Int> priorityQueue = new PriorityQueue<Vector2Int>();
+        
+        for (int x = 0; x < gridWidth; x++)
         {
-            distanceMap[x, y] = float.MaxValue;
-            itemMap[x, y] = 0;
-        }
-    }
-    
-    foreach (var apple in apples)
-    {
-        if (apple == null) continue;
-
-        Vector2Int gridPosition = WorldToCell(apple.transform.position);
-        if (IsValidGridPosition(gridPosition))
-        {
-            distanceMap[gridPosition.x, gridPosition.y] = 0;
-            priorityQueue.Enqueue(gridPosition, 0);
-        }
-    }
-
-    while (priorityQueue.Count > 0)
-    {
-        var current = priorityQueue.Dequeue();
-        int x = current.x;
-        int y = current.y;
-
-        if (visited[x, y]) continue;
-        visited[x, y] = true;
-
-        float currentDistance = distanceMap[x, y];
-        float attractiveness = Mathf.Max(0, maxAttractionDistance - currentDistance);
-        itemMap[x, y] = attractiveness;
-
-        foreach (var direction in directions)
-        {
-            Vector2Int neighbor = new Vector2Int(x + direction.x, y + direction.y);
-
-            if (IsValidGridPosition(neighbor) && !visited[neighbor.x, neighbor.y] && !IsObstacleCell(neighbor))
+            for (int y = 0; y < gridHeight; y++)
             {
-                float newDistance = currentDistance + cellSize;
-                if (newDistance < distanceMap[neighbor.x, neighbor.y])
+                distanceMap[x, y] = float.MaxValue;
+                threatMap[x, y] = 0;
+            }
+        }
+
+        // 敵の位置をキューに追加
+        foreach (var ghost in ghosts)
+        {
+            if (ghost == null) continue;
+
+            Vector2Int gridPosition = WorldToCell(ghost.position);
+            if (IsValidGridPosition(gridPosition))
+            {
+                distanceMap[gridPosition.x, gridPosition.y] = 0;
+                priorityQueue.Enqueue(gridPosition, 0);
+            }
+        }
+        
+        
+        // ダイクストラ法
+        while (priorityQueue.Count > 0)
+        {
+            var current = priorityQueue.Dequeue();
+            int x = current.x;
+            int y = current.y;
+
+            if (visited[x, y]) continue;
+            visited[x, y] = true;
+
+            float currentDistance = distanceMap[x, y];
+            float threat = Mathf.Max(0, maxThreatDistance - currentDistance);
+            threatMap[x, y] = threat;
+
+            foreach (var direction in directions)
+            {
+                Vector2Int neighbor = new Vector2Int(x + direction.x, y + direction.y);
+
+                if (IsValidGridPosition(neighbor) && !visited[neighbor.x, neighbor.y] && !IsObstacleCell(neighbor))
                 {
-                    distanceMap[neighbor.x, neighbor.y] = newDistance;
-                    priorityQueue.Enqueue(neighbor, newDistance);
+                    float newDistance = currentDistance + cellSize;
+                    if (newDistance < distanceMap[neighbor.x, neighbor.y])
+                    {
+                        distanceMap[neighbor.x, neighbor.y] = newDistance;
+                        priorityQueue.Enqueue(neighbor, newDistance);
+                    }
                 }
             }
         }
     }
-}
 ```
 
 - ダイクストラ法により、**影響源に近いエリアから順番に計算が進む**ため、無駄なセルの再計算を防ぎ、パフォーマンスの向上を実現しました。

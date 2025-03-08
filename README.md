@@ -1,8 +1,9 @@
 # InfluenceMap
 
 ## 概要
-InfluenceMap（影響マップ）は、Unityを使用してゲーム内の脅威度やアイテムの狙いやすさをマップ上に可視化するシステムです。
-敵（Ghosts）の位置やアイテム（Apples）の配置を基に、プレイヤーが安全で有利なポジションを視覚的に把握できるようにしています。
+InfluenceMap（影響マップ）は、ゲーム内の脅威度やアイテムの狙いやすさをマップ上に反映します。
+これにより敵（Ghosts）の位置やアイテム（Apples）の配置を基に、プレイヤーが安全で有利なポジションを把握できるようになります。
+
 
 参考サイト: [Cygames Tech Blog](https://tech.cygames.co.jp/archives/2272/)
 
@@ -11,6 +12,7 @@ InfluenceMap（影響マップ）は、Unityを使用してゲーム内の脅威
 ## 特徴
 - **セル単位の可視化による影響度表示**
 - **脅威度とアイテムの狙いやすさの加重合成**
+- **ダイクストラ法による効率的な影響マップの更新**
 
 ---
 
@@ -38,27 +40,72 @@ private void CombineMaps()
 - 例えば、敵をより警戒するAIを制作したい場合 `threatWeight` を高く設定し、より安全なルートを選択する行動を促すことができます。
 - また、脅威度とアイテムの狙いやすさ以外の項目を追加することで様々な特性を持ったAIを量産することが可能です。
 
-### 2. 距離による影響度の減衰処理
+### 2. ダイクストラ法を活用した影響マップ更新
 
-- 脅威やアイテムからの影響度を、距離に応じて減衰させるアルゴリズムを実装しています。
+- 脅威マップ (`UpdateThreatMap`) とアイテムマップ (`UpdateItemMap`) の両方で、ダイクストラ法を使用した効率的な影響度計算を行っています。
 
+// 
 ```csharp
-private float CalculateThreat(Vector2 cellWorldPosition)
+private void UpdateItemMap()
 {
-    float totalThreat = 0;
-    foreach (var ghost in ghosts)
+    List<GameObject> apples = appleManager.GetActiveApples();
+    float[,] distanceMap = new float[gridWidth, gridHeight];
+    bool[,] visited = new bool[gridWidth, gridHeight];
+    PriorityQueue<Vector2Int> priorityQueue = new PriorityQueue<Vector2Int>();
+    
+    for (int x = 0; x < gridWidth; x++)
     {
-        float distance = Vector2.Distance(cellWorldPosition, ghost.position);
-        if (distance <= maxThreatDistance)
+        for (int y = 0; y < gridHeight; y++)
         {
-            totalThreat += Mathf.Max(0, maxThreatDistance - distance);
+            distanceMap[x, y] = float.MaxValue;
+            itemMap[x, y] = 0;
         }
     }
-    return totalThreat;
+    
+    foreach (var apple in apples)
+    {
+        if (apple == null) continue;
+
+        Vector2Int gridPosition = WorldToCell(apple.transform.position);
+        if (IsValidGridPosition(gridPosition))
+        {
+            distanceMap[gridPosition.x, gridPosition.y] = 0;
+            priorityQueue.Enqueue(gridPosition, 0);
+        }
+    }
+
+    while (priorityQueue.Count > 0)
+    {
+        var current = priorityQueue.Dequeue();
+        int x = current.x;
+        int y = current.y;
+
+        if (visited[x, y]) continue;
+        visited[x, y] = true;
+
+        float currentDistance = distanceMap[x, y];
+        float attractiveness = Mathf.Max(0, maxAttractionDistance - currentDistance);
+        itemMap[x, y] = attractiveness;
+
+        foreach (var direction in directions)
+        {
+            Vector2Int neighbor = new Vector2Int(x + direction.x, y + direction.y);
+
+            if (IsValidGridPosition(neighbor) && !visited[neighbor.x, neighbor.y] && !IsObstacleCell(neighbor))
+            {
+                float newDistance = currentDistance + cellSize;
+                if (newDistance < distanceMap[neighbor.x, neighbor.y])
+                {
+                    distanceMap[neighbor.x, neighbor.y] = newDistance;
+                    priorityQueue.Enqueue(neighbor, newDistance);
+                }
+            }
+        }
+    }
 }
 ```
 
-- 距離が `maxThreatDistance` を超えると影響度がゼロになるため、計算量を抑えつつも、近い要素を優先する行動が可能です。
+- ダイクストラ法により、**影響源に近いエリアから順番に計算が進む**ため、無駄なセルの再計算を防ぎ、パフォーマンスの向上を実現しました。
 
 ### 3. スコアの正規化
 
@@ -71,18 +118,18 @@ for (int x = 0; x < gridWidth; x++)
     {
         if (!IsObstacleCell(new Vector2Int(x, y)))
         {
-            combinedMap[x, y] = (combinedMap[x, y] - minScore) / (maxScore - minScore);
+            combinedMap[x, y] = (combinedMap[x, y] - minScore) / Mathf.Max(maxScore - minScore, Mathf.Epsilon);
         }
     }
 }
 ```
 
-- 正規化により、スコアが0〜1の範囲に収まるため、他のAIやシステムと統合しやすくなっています。
-- また、正規化することで視覚化する際の色付けや、エージェントが行動を選択する際のしきい値設定も容易になります。
+- 正規化することで、スコアが0〜1の範囲に収まるため、他のAIやシステムと統合しやすくなっています。
+- 視覚化する際の色付けや、エージェントが行動を選択する際のしきい値設定も容易になります。
 
 ---
 
 ## 今後の改善点
-- 影響マップのパフォーマンス最適化
-- マルチスレッド化による実行速度の向上
+- 影響マップのさらなるパフォーマンス最適化
+- 3D空間での影響マップ実装
 
